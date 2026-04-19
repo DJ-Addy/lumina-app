@@ -16,7 +16,7 @@ import { CommunityPostCard } from "../../src/components/CommunityPostCard";
 import type { CommunityPost } from "@lumina/shared";
 import { colors, spacing, typography, radius } from "../../src/theme/tokens";
 
-type FeedTab = "latest" | "following";
+type FeedTab = "latest" | "following" | "saved";
 
 export default function CommunityScreen() {
   const [activeTab, setActiveTab] = useState<FeedTab>("latest");
@@ -31,10 +31,11 @@ export default function CommunityScreen() {
           limit: 20,
         }),
       initialPageParam: undefined as string | undefined,
-      getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor ?? undefined : undefined,
+      getNextPageParam: (lastPage) =>
+        lastPage.hasMore ? lastPage.nextCursor ?? undefined : undefined,
     });
 
-  const posts = data?.pages.flatMap((p) => p.posts) ?? [];
+  const posts: CommunityPost[] = data?.pages.flatMap((p) => p.posts) ?? [];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -43,15 +44,27 @@ export default function CommunityScreen() {
         <Text style={styles.subtitle}>Anonymous moms, witnessed</Text>
       </View>
 
+      {/* Reels entry tile */}
+      <Pressable
+        style={styles.reelsTile}
+        onPress={() => router.push("/community/reels" as never)}
+      >
+        <View>
+          <Text style={styles.reelsTitle}>Reels</Text>
+          <Text style={styles.reelsSubtitle}>A vertical scroll of mom moments</Text>
+        </View>
+        <Text style={styles.reelsGlyph}>▶</Text>
+      </Pressable>
+
       <View style={styles.tabs}>
-        {(["latest", "following"] as FeedTab[]).map((tab) => (
+        {(["latest", "following", "saved"] as FeedTab[]).map((tab) => (
           <Pressable
             key={tab}
             style={[styles.tab, activeTab === tab && styles.tabActive]}
             onPress={() => setActiveTab(tab)}
           >
             <Text style={[styles.tabLabel, activeTab === tab && styles.tabLabelActive]}>
-              {tab === "latest" ? "Latest" : "Following"}
+              {tab === "latest" ? "Latest" : tab === "following" ? "Following" : "Saved"}
             </Text>
           </Pressable>
         ))}
@@ -95,11 +108,17 @@ export default function CommunityScreen() {
             <View style={styles.empty}>
               <Text style={styles.emptyIcon}>☽</Text>
               <Text style={styles.emptyTitle}>
-                {activeTab === "following" ? "Follow some moms first" : "Be the first to share"}
+                {activeTab === "following"
+                  ? "Follow some moms first"
+                  : activeTab === "saved"
+                  ? "Nothing saved yet"
+                  : "Be the first to share"}
               </Text>
               <Text style={styles.emptySub}>
                 {activeTab === "following"
                   ? "Explore the Latest tab to find moms to follow"
+                  : activeTab === "saved"
+                  ? "Tap ★ on a post to bookmark it for later"
                   : "Your entry could be exactly what someone needs to read tonight"}
               </Text>
             </View>
@@ -119,6 +138,26 @@ const styles = StyleSheet.create({
     fontWeight: typography.weight.bold,
   },
   subtitle: { fontSize: typography.size.sm, color: colors.text.muted, fontStyle: "italic" },
+  reelsTile: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.lg,
+    backgroundColor: `${colors.accent.purple}18`,
+    borderWidth: 1,
+    borderColor: `${colors.accent.purple}50`,
+  },
+  reelsTitle: {
+    fontSize: typography.size.lg,
+    color: colors.text.primary,
+    fontWeight: typography.weight.semibold,
+  },
+  reelsSubtitle: { fontSize: typography.size.sm, color: colors.text.muted, marginTop: 2 },
+  reelsGlyph: { fontSize: 22, color: colors.accent.purple },
   tabs: {
     flexDirection: "row",
     alignItems: "center",

@@ -44,16 +44,6 @@ export default function PostDetailScreen() {
     onError: () => Alert.alert("Error", "Could not post your comment."),
   });
 
-  const reportMutation = useMutation({
-    mutationFn: () =>
-      communityService.report({
-        targetType: "post",
-        targetId: id!,
-        reason: "harmful_content",
-      }),
-    onSuccess: () => Alert.alert("Reported", "Thank you. Our team will review this post."),
-  });
-
   if (postQuery.isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -65,17 +55,7 @@ export default function PostDetailScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {postQuery.data && (
-          <CommunityPostCard
-            post={postQuery.data.post}
-            onReportPress={() =>
-              Alert.alert("Report post", "Is this content harmful or inappropriate?", [
-                { text: "Cancel", style: "cancel" },
-                { text: "Report", style: "destructive", onPress: () => reportMutation.mutate() },
-              ])
-            }
-          />
-        )}
+        {postQuery.data && <CommunityPostCard post={postQuery.data.post} />}
 
         <View style={styles.commentsSection}>
           <Text style={styles.commentsHeader}>

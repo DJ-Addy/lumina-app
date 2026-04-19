@@ -36,6 +36,7 @@ export default function JournalEntryScreen() {
   const shareMutation = useMutation({
     mutationFn: () =>
       communityService.createPost({
+        postType: "text",
         content: data!.entry.content,
         excerpt:
           data!.entry.content.length > 280

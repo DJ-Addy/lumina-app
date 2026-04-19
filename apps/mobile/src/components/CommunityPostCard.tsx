@@ -1,25 +1,20 @@
 import React from "react";
 import { StyleSheet, Text, View, Pressable } from "react-native";
+import { router } from "expo-router";
 import type { CommunityPost } from "@lumina/shared";
 import { GlassCard } from "./GlassCard";
+import { MediaPreview } from "./MediaPreview";
+import { PollCard } from "./PollCard";
+import { PostActionBar } from "./PostActionBar";
 import { colors, spacing, typography, radius } from "../theme/tokens";
-
-const REACTION_EMOJIS: Record<string, string> = {
-  heart: "♥",
-  candle: "🕯",
-  moon: "◉",
-  star: "✦",
-};
 
 interface CommunityPostCardProps {
   post: CommunityPost;
   onPress?: () => void;
   onFollowPress?: () => void;
-  onReportPress?: () => void;
 }
 
-export function CommunityPostCard({ post, onPress, onFollowPress, onReportPress }: CommunityPostCardProps) {
-  const totalReactions = Object.values(post.reactionCounts).reduce((a, b) => a + b, 0);
+export function CommunityPostCard({ post, onPress, onFollowPress }: CommunityPostCardProps) {
   const timeAgo = formatTimeAgo(post.createdAt);
 
   return (
@@ -33,44 +28,75 @@ export function CommunityPostCard({ post, onPress, onFollowPress, onReportPress 
           </View>
           <View style={styles.authorInfo}>
             <Text style={styles.alias}>{post.authorProfile?.alias ?? "Anonymous"}</Text>
-            <Text style={styles.time}>{timeAgo}</Text>
+            <Text style={styles.time}>
+              {timeAgo}
+              {post.postType !== "text" ? ` · ${labelForType(post.postType)}` : ""}
+            </Text>
           </View>
           {onFollowPress && !post.viewerIsFollowing && (
             <Pressable style={styles.followBtn} onPress={onFollowPress}>
               <Text style={styles.followBtnLabel}>Follow</Text>
             </Pressable>
           )}
-          {onReportPress && (
-            <Pressable onPress={onReportPress} style={styles.moreBtn}>
-              <Text style={styles.moreBtnLabel}>···</Text>
-            </Pressable>
-          )}
         </View>
 
-        <Text style={styles.content}>
-          {post.excerpt ?? post.content}
-        </Text>
+        {/* Repost preview */}
+        {post.postType === "repost" && post.repostOf && (
+          <View style={styles.repostBox}>
+            <Text style={styles.repostHeader}>
+              ↻ from @{post.repostOf.authorProfile?.alias ?? "anonymous"}
+            </Text>
+            {!!post.repostOf.content && (
+              <Text style={styles.repostContent} numberOfLines={4}>
+                {post.repostOf.excerpt ?? post.repostOf.content}
+              </Text>
+            )}
+            {post.repostOf.media.length > 0 && (
+              <View style={{ marginTop: spacing.sm }}>
+                <MediaPreview
+                  media={post.repostOf.media}
+                  onVideoPress={() => router.push("/community/reels" as never)}
+                />
+              </View>
+            )}
+          </View>
+        )}
+
+        {!!post.content && post.postType !== "repost" && (
+          <Text style={styles.content}>{post.excerpt ?? post.content}</Text>
+        )}
+
+        {post.media.length > 0 && (
+          <View style={styles.mediaWrap}>
+            <MediaPreview
+              media={post.media}
+              onVideoPress={() => router.push("/community/reels" as never)}
+            />
+          </View>
+        )}
+
+        {post.poll && (
+          <PollCard poll={post.poll} />
+        )}
 
         {post.isFromJournal && (
           <Text style={styles.journalBadge}>✍ from journal</Text>
         )}
 
-        <View style={styles.footer}>
-          <View style={styles.reactions}>
-            {Object.entries(post.reactionCounts).map(([type, count]) => (
-              <View key={type} style={styles.reaction}>
-                <Text style={styles.reactionEmoji}>{REACTION_EMOJIS[type] ?? "♥"}</Text>
-                <Text style={styles.reactionCount}>{count}</Text>
-              </View>
-            ))}
-          </View>
-          <Text style={styles.commentCount}>
-            {post.commentCount > 0 ? `${post.commentCount} replies` : ""}
-          </Text>
-        </View>
+        <PostActionBar post={post} orientation="horizontal" />
       </GlassCard>
     </Pressable>
   );
+}
+
+function labelForType(t: CommunityPost["postType"]): string {
+  switch (t) {
+    case "image": return "photo";
+    case "video": return "reel";
+    case "poll": return "poll";
+    case "repost": return "repost";
+    default: return "";
+  }
 }
 
 function formatTimeAgo(isoString: string): string {
@@ -126,12 +152,13 @@ const styles = StyleSheet.create({
     color: colors.accent.purple,
     fontWeight: typography.weight.semibold,
   },
-  moreBtn: { padding: spacing.xs },
-  moreBtnLabel: { fontSize: typography.size.md, color: colors.text.muted },
   content: {
     fontSize: typography.size.md,
     color: colors.text.secondary,
     lineHeight: typography.size.md * typography.lineHeight.relaxed,
+    marginBottom: spacing.sm,
+  },
+  mediaWrap: {
     marginBottom: spacing.sm,
   },
   journalBadge: {
@@ -139,17 +166,22 @@ const styles = StyleSheet.create({
     color: colors.text.muted,
     marginBottom: spacing.sm,
   },
-  footer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderTopWidth: 1,
-    borderTopColor: colors.border.subtle,
-    paddingTop: spacing.sm,
+  repostBox: {
+    backgroundColor: colors.background.card,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+    marginBottom: spacing.sm,
   },
-  reactions: { flexDirection: "row", gap: spacing.sm },
-  reaction: { flexDirection: "row", alignItems: "center", gap: 4 },
-  reactionEmoji: { fontSize: typography.size.sm, color: colors.accent.rose },
-  reactionCount: { fontSize: typography.size.xs, color: colors.text.muted },
-  commentCount: { fontSize: typography.size.xs, color: colors.text.muted },
+  repostHeader: {
+    fontSize: typography.size.xs,
+    color: colors.text.muted,
+    marginBottom: spacing.xs,
+  },
+  repostContent: {
+    fontSize: typography.size.sm,
+    color: colors.text.secondary,
+    lineHeight: typography.size.sm * typography.lineHeight.relaxed,
+  },
 });

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SummaryCadence, MoodTag } from \"./enums\";
+import { SummaryCadence, MoodTag } from "./enums";
 
 export const SummarySchema = z.object({
   id: z.string().uuid(),

@@ -5,6 +5,7 @@ import { colors, typography } from "../../src/theme/tokens";
 
 const TAB_ICONS: Record<string, string> = {
   home: "✦",
+  cosmos: "☉",
   timeline: "◉",
   community: "☽",
   settings: "○",
@@ -42,6 +43,7 @@ export default function TabsLayout() {
       })}
     >
       <Tabs.Screen name="home" options={{ title: "Home" }} />
+      <Tabs.Screen name="cosmos" options={{ title: "Cosmos" }} />
       <Tabs.Screen name="timeline" options={{ title: "Timeline" }} />
       <Tabs.Screen name="community" options={{ title: "Community" }} />
       <Tabs.Screen name="settings" options={{ title: "Settings" }} />

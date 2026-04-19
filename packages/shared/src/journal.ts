@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { JournalEntryMode, MoodTag } from \"./enums\";
+import { JournalEntryMode, MoodTag } from "./enums";
 
 export const JournalEntrySchema = z.object({
   id: z.string().uuid(),

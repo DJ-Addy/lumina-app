@@ -11,6 +11,8 @@ export const queues = {
   partnerInsight: new Queue("partnerinsight.generate", { connection }),
   communityModeration: new Queue("community.moderation.scan", { connection }),
   communityFeedRank: new Queue("community.feed.rank", { connection }),
+  videoProcess: new Queue("video.process", { connection }),
+  communityReports: new Queue("community.reports.review", { connection }),
 };
 
 export type QueueName = keyof typeof queues;

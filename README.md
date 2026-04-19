@@ -81,6 +81,8 @@ pnpm --filter mobile dev
 | `pnpm lint` | Lint all packages |
 | `pnpm typecheck` | TypeScript check all packages |
 | `pnpm format` | Format all files with Prettier |
+| pnpm.cmd --filter @lumina/mobile exec expo start --clear|
+
 
 ## Privacy
 

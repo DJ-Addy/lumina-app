@@ -7,7 +7,7 @@ import {
   ReportRequestSchema,
   SummarySchema,
   RequestMemoryBookExportSchema,
-} from \"../index\";
+} from "../index";
 
 describe("CreateJournalEntryRequestSchema", () => {
   it("accepts valid text entry", () => {

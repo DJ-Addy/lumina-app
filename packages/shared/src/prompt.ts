@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PromptCategory } from \"./enums\";
+import { PromptCategory } from "./enums";
 
 export const PromptSchema = z.object({
   id: z.string().uuid(),

@@ -1,6 +1,30 @@
 import { supabase } from "./supabase";
 
-const BASE_URL = process.env["EXPO_PUBLIC_API_BASE_URL"] ?? "http://localhost:3000";
+const RAW_BASE = process.env["EXPO_PUBLIC_API_BASE_URL"];
+const BASE_URL = RAW_BASE ?? "http://localhost:3000";
+
+/** True when an API server URL was actually provided via env. */
+export const hasApiConfig = Boolean(RAW_BASE);
+
+let warnedNoApi = false;
+function warnNoApi() {
+  if (warnedNoApi) return;
+  warnedNoApi = true;
+  console.warn(
+    "[lumina-mobile] EXPO_PUBLIC_API_BASE_URL is not set — running in demo mode. Network calls will be skipped.",
+  );
+}
+
+class DemoModeError extends Error {
+  override readonly name = "DemoModeError";
+  constructor() {
+    super("Lumina is running in demo mode (no API configured).");
+  }
+}
+
+export function isDemoModeError(err: unknown): boolean {
+  return err instanceof DemoModeError;
+}
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
@@ -12,6 +36,10 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
+  if (!hasApiConfig) {
+    warnNoApi();
+    throw new DemoModeError();
+  }
   const headers = await getAuthHeaders();
   const res = await fetch(`${BASE_URL}${path}`, { headers });
   if (!res.ok) {
@@ -22,6 +50,10 @@ export async function apiGet<T>(path: string): Promise<T> {
 }
 
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
+  if (!hasApiConfig) {
+    warnNoApi();
+    throw new DemoModeError();
+  }
   const headers = await getAuthHeaders();
   const res = await fetch(`${BASE_URL}${path}`, {
     method: "POST",
@@ -37,6 +69,10 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
 }
 
 export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
+  if (!hasApiConfig) {
+    warnNoApi();
+    throw new DemoModeError();
+  }
   const headers = await getAuthHeaders();
   const res = await fetch(`${BASE_URL}${path}`, {
     method: "PATCH",
@@ -51,6 +87,10 @@ export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
 }
 
 export async function apiDelete(path: string): Promise<void> {
+  if (!hasApiConfig) {
+    warnNoApi();
+    throw new DemoModeError();
+  }
   const headers = await getAuthHeaders();
   const res = await fetch(`${BASE_URL}${path}`, { method: "DELETE", headers });
   if (!res.ok) {

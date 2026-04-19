@@ -1,21 +1,8 @@
 import type { FastifyInstance } from "fastify";
-import { CreateAstrologyProfileRequestSchema } from "@lumina/shared";
+import { CreateAstrologyProfileRequestSchema, type Placement, type ZodiacSign } from "@lumina/shared";
 import { supabase } from "../lib/supabase.js";
-
-const SUN_SIGNS = [
-  { sign: "Aries", startMonth: 3, startDay: 21 },
-  { sign: "Taurus", startMonth: 4, startDay: 20 },
-  { sign: "Gemini", startMonth: 5, startDay: 21 },
-  { sign: "Cancer", startMonth: 6, startDay: 21 },
-  { sign: "Leo", startMonth: 7, startDay: 23 },
-  { sign: "Virgo", startMonth: 8, startDay: 23 },
-  { sign: "Libra", startMonth: 9, startDay: 23 },
-  { sign: "Scorpio", startMonth: 10, startDay: 23 },
-  { sign: "Sagittarius", startMonth: 11, startDay: 22 },
-  { sign: "Capricorn", startMonth: 12, startDay: 22 },
-  { sign: "Aquarius", startMonth: 1, startDay: 20 },
-  { sign: "Pisces", startMonth: 2, startDay: 19 },
-];
+import { computeNatalChart, quickSunSign } from "../lib/natalChart.js";
+import { buildDailyHoroscope } from "../lib/dailyHoroscope.js";
 
 export async function astrologyRoutes(fastify: FastifyInstance) {
   fastify.addHook("preHandler", fastify.authenticate);
@@ -26,8 +13,21 @@ export async function astrologyRoutes(fastify: FastifyInstance) {
       return reply.status(400).send({ code: "VALIDATION_ERROR", message: body.error.message });
     }
 
-    const sunSign = getSunSign(body.data.birthDate);
-    const babySunSign = body.data.babyBirthDate ? getSunSign(body.data.babyBirthDate) : null;
+    const chart = computeNatalChart({
+      birthDate: body.data.birthDate,
+      birthTime: body.data.birthTime ?? null,
+      birthPlace: body.data.birthPlace ?? null,
+      latitude: body.data.birthLatitude ?? null,
+      longitude: body.data.birthLongitude ?? null,
+    });
+
+    const sunSign =
+      chart.placements.find((p: Placement) => p.planet === "sun")?.sign ??
+      quickSunSign(body.data.birthDate);
+    const moonSign = chart.placements.find((p: Placement) => p.planet === "moon")?.sign ?? null;
+    const risingSign =
+      chart.placements.find((p: Placement) => p.planet === "ascendant")?.sign ?? null;
+    const babySunSign = body.data.babyBirthDate ? quickSunSign(body.data.babyBirthDate) : null;
 
     const { data, error } = await supabase
       .from("astrology_profiles")
@@ -36,9 +36,12 @@ export async function astrologyRoutes(fastify: FastifyInstance) {
         birth_date: body.data.birthDate,
         birth_time: body.data.birthTime ?? null,
         birth_place: body.data.birthPlace ?? null,
+        birth_latitude: body.data.birthLatitude ?? null,
+        birth_longitude: body.data.birthLongitude ?? null,
         sun_sign: sunSign,
-        moon_sign: null,
-        rising_sign: null,
+        moon_sign: moonSign,
+        rising_sign: risingSign,
+        natal_chart: chart,
         baby_birth_date: body.data.babyBirthDate ?? null,
         baby_sun_sign: babySunSign,
       })
@@ -46,7 +49,9 @@ export async function astrologyRoutes(fastify: FastifyInstance) {
       .single();
 
     if (error || !data) {
-      return reply.status(500).send({ code: "DB_ERROR", message: "Failed to save astrology profile" });
+      return reply
+        .status(500)
+        .send({ code: "DB_ERROR", message: "Failed to save astrology profile" });
     }
 
     return reply.status(201).send({ profile: mapAstrologyProfile(data) });
@@ -63,6 +68,63 @@ export async function astrologyRoutes(fastify: FastifyInstance) {
       return reply.status(404).send({ code: "NOT_FOUND", message: "No astrology profile yet" });
     }
     return reply.send({ profile: mapAstrologyProfile(data) });
+  });
+
+  fastify.get("/natal-chart", async (request, reply) => {
+    const { data } = await supabase
+      .from("astrology_profiles")
+      .select()
+      .eq("user_id", request.user.id)
+      .single();
+
+    if (!data) {
+      return reply
+        .status(404)
+        .send({ code: "NOT_FOUND", message: "Add your birth date in profile setup first." });
+    }
+
+    const cached = data["natal_chart"] as ReturnType<typeof computeNatalChart> | null;
+    if (cached) return reply.send({ chart: cached });
+
+    const chart = computeNatalChart({
+      birthDate: data["birth_date"] as string,
+      birthTime: (data["birth_time"] as string | null) ?? null,
+      birthPlace: (data["birth_place"] as string | null) ?? null,
+      latitude: (data["birth_latitude"] as number | null) ?? null,
+      longitude: (data["birth_longitude"] as number | null) ?? null,
+    });
+
+    await supabase
+      .from("astrology_profiles")
+      .update({ natal_chart: chart })
+      .eq("user_id", request.user.id);
+
+    return reply.send({ chart });
+  });
+
+  fastify.get("/daily-horoscope", async (request, reply) => {
+    const { data } = await supabase
+      .from("astrology_profiles")
+      .select()
+      .eq("user_id", request.user.id)
+      .single();
+
+    const sunSign = (data?.["sun_sign"] as ZodiacSign | null) ?? null;
+
+    // Try cached natal chart first; fall back to recomputing.
+    let natal = (data?.["natal_chart"] as ReturnType<typeof computeNatalChart> | null) ?? null;
+    if (!natal && data?.["birth_date"]) {
+      natal = computeNatalChart({
+        birthDate: data["birth_date"] as string,
+        birthTime: (data["birth_time"] as string | null) ?? null,
+        birthPlace: (data["birth_place"] as string | null) ?? null,
+        latitude: (data["birth_latitude"] as number | null) ?? null,
+        longitude: (data["birth_longitude"] as number | null) ?? null,
+      });
+    }
+
+    const horoscope = await buildDailyHoroscope({ sunSign, natal });
+    return reply.send(horoscope);
   });
 
   fastify.get("/cosmic-card", async (request, reply) => {
@@ -85,41 +147,28 @@ export async function astrologyRoutes(fastify: FastifyInstance) {
         astroProfile?.["sun_sign"] as string | null,
       ),
       weeklyForecast: null,
-      momBabyInsight:
-        astroProfile?.["baby_sun_sign"]
-          ? generateMomBabyInsight(
-              astroProfile["sun_sign"] as string,
-              astroProfile["baby_sun_sign"] as string,
-            )
-          : null,
+      momBabyInsight: astroProfile?.["baby_sun_sign"]
+        ? generateMomBabyInsight(
+            astroProfile["sun_sign"] as string,
+            astroProfile["baby_sun_sign"] as string,
+          )
+        : null,
       journalPromptSuggestion: generateCosmicPrompt(moonPhase),
       date: today,
     });
   });
 }
 
-function getSunSign(dateStr: string): string {
-  const date = new Date(dateStr);
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-
-  for (const { sign, startMonth, startDay } of SUN_SIGNS) {
-    const nextSign = SUN_SIGNS[(SUN_SIGNS.indexOf({ sign, startMonth, startDay }) + 1) % 12];
-    if (!nextSign) continue;
-    if (
-      (month === startMonth && day >= startDay) ||
-      (month === nextSign.startMonth && day < nextSign.startDay)
-    ) {
-      return sign;
-    }
-  }
-  return "Capricorn";
-}
-
 function getCurrentMoonPhase(): string {
   const phases = [
-    "New Moon", "Waxing Crescent", "First Quarter", "Waxing Gibbous",
-    "Full Moon", "Waning Gibbous", "Last Quarter", "Waning Crescent",
+    "New Moon",
+    "Waxing Crescent",
+    "First Quarter",
+    "Waxing Gibbous",
+    "Full Moon",
+    "Waning Gibbous",
+    "Last Quarter",
+    "Waning Crescent",
   ];
   const dayOfYear = Math.floor(
     (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000,
@@ -129,8 +178,18 @@ function getCurrentMoonPhase(): string {
 
 function getMoonSign(): string {
   const signs = [
-    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
-    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+    "Aries",
+    "Taurus",
+    "Gemini",
+    "Cancer",
+    "Leo",
+    "Virgo",
+    "Libra",
+    "Scorpio",
+    "Sagittarius",
+    "Capricorn",
+    "Aquarius",
+    "Pisces",
   ];
   const dayOfYear = Math.floor(
     (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000,
@@ -138,7 +197,11 @@ function getMoonSign(): string {
   return signs[Math.floor(dayOfYear / 2.5) % 12] ?? "Cancer";
 }
 
-function generateDailyContext(moonPhase: string, moonSign: string, sunSign: string | null): string {
+function generateDailyContext(
+  moonPhase: string,
+  moonSign: string,
+  sunSign: string | null,
+): string {
   const base = `Today's ${moonSign} moon (${moonPhase}) invites you to notice what's sitting quietly beneath the surface.`;
   if (sunSign) {
     return `${base} As a ${sunSign}, this energy may feel especially ${moonSign === sunSign ? "familiar" : "expansive"} today.`;
@@ -167,9 +230,12 @@ function mapAstrologyProfile(row: Record<string, unknown>) {
     birthDate: row["birth_date"],
     birthTime: row["birth_time"],
     birthPlace: row["birth_place"],
+    birthLatitude: row["birth_latitude"] ?? null,
+    birthLongitude: row["birth_longitude"] ?? null,
     sunSign: row["sun_sign"],
     moonSign: row["moon_sign"],
     risingSign: row["rising_sign"],
+    natalChart: row["natal_chart"] ?? null,
     babyBirthDate: row["baby_birth_date"],
     babySunSign: row["baby_sun_sign"],
   };

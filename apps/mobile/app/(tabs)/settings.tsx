@@ -12,7 +12,7 @@ import { router } from "expo-router";
 import { useAuthStore } from "../../src/store/auth";
 import { GlassCard } from "../../src/components/GlassCard";
 import { CTAButton } from "../../src/components/CTAButton";
-import { apiDelete, apiGet } from "../../src/lib/api";
+import { apiDelete, apiGet, hasApiConfig, isDemoModeError } from "../../src/lib/api";
 import { colors, spacing, typography, radius } from "../../src/theme/tokens";
 
 interface CreditStatus {
@@ -48,12 +48,19 @@ export default function SettingsScreen() {
   const [credits, setCredits] = useState<CreditStatus | null>(null);
 
   useEffect(() => {
+    if (!hasApiConfig) return;
     apiGet<CreditStatus>("/v1/profile/me/credits")
       .then(setCredits)
-      .catch(console.error);
+      .catch((err) => {
+        if (!isDemoModeError(err)) console.warn("Failed to load credits:", err);
+      });
   }, []);
 
   const handleExport = async () => {
+    if (!hasApiConfig) {
+      Alert.alert("Demo mode", "Connect a Lumina API server to export your data.");
+      return;
+    }
     try {
       const data = await apiGet<unknown>("/v1/profile/me/export");
       Alert.alert("Export ready", "Your data has been exported. Check the console in dev mode.");
@@ -73,6 +80,10 @@ export default function SettingsScreen() {
           text: "Delete everything",
           style: "destructive",
           onPress: async () => {
+            if (!hasApiConfig) {
+              await signOut();
+              return;
+            }
             try {
               await apiDelete("/v1/profile/me");
               await signOut();

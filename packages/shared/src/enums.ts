@@ -76,3 +76,30 @@ export const ModerationStatus = {
   DISMISSED: "dismissed",
 } as const;
 export type ModerationStatus = (typeof ModerationStatus)[keyof typeof ModerationStatus];
+
+export const CommunityPostType = {
+  TEXT: "text",
+  IMAGE: "image",
+  VIDEO: "video",
+  POLL: "poll",
+  REPOST: "repost",
+} as const;
+export type CommunityPostType =
+  (typeof CommunityPostType)[keyof typeof CommunityPostType];
+
+export const CommunityMediaKind = {
+  IMAGE: "image",
+  VIDEO: "video",
+} as const;
+export type CommunityMediaKind =
+  (typeof CommunityMediaKind)[keyof typeof CommunityMediaKind];
+
+export const CommunityMediaStatus = {
+  PENDING: "pending",
+  PROCESSING: "processing",
+  READY: "ready",
+  FAILED: "failed",
+  DELETED: "deleted",
+} as const;
+export type CommunityMediaStatus =
+  (typeof CommunityMediaStatus)[keyof typeof CommunityMediaStatus];

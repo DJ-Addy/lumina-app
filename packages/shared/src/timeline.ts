@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { JournalEntrySchema } from \"./journal\";
+import { JournalEntrySchema } from "./journal";
 
 export const TimelineCheckpointSchema = z.object({
   id: z.string().uuid(),
