@@ -1,0 +1,35 @@
+{
+  "name": "@lumina/worker",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Lumina BullMQ background job worker",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "test": "vitest run",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.37.0",
+    "@lumina/shared": "workspace:*",
+    "@react-pdf/renderer": "^4.1.0",
+    "@sentry/node": "^8.0.0",
+    "@supabase/supabase-js": "^2.47.0",
+    "bullmq": "^5.0.0",
+    "ioredis": "^5.4.0",
+    "openai": "^4.77.0",
+    "pino": "^9.5.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "rimraf": "^6.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}
