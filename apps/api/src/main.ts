@@ -1,5 +1,14 @@
 import Fastify from "fastify";
+import * as Sentry from "@sentry/node";
 import { env } from "./lib/env.js";
+
+if (env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: env.SENTRY_DSN,
+    environment: env.NODE_ENV,
+    tracesSampleRate: env.NODE_ENV === "production" ? 0.1 : 1.0,
+  });
+}
 import authPlugin from "./plugins/auth.js";
 import corsPlugin from "./plugins/cors.js";
 import rateLimitPlugin from "./plugins/rateLimit.js";
@@ -13,6 +22,7 @@ import { memoryBookRoutes } from "./routes/memoryBook.js";
 import { communityRoutes } from "./routes/community.js";
 import { communityMediaRoutes } from "./routes/communityMedia.js";
 import { communityReelsRoutes } from "./routes/communityReels.js";
+import { moderationRoutes } from "./routes/moderation.js";
 import { astrologyRoutes } from "./routes/astrology.js";
 import { profileRoutes } from "./routes/profile.js";
 import { chatRoutes } from "./routes/chat.js";
@@ -49,6 +59,7 @@ await fastify.register(memoryBookRoutes, { prefix: "/v1/memory-book" });
 await fastify.register(communityRoutes, { prefix: "/v1/community" });
 await fastify.register(communityMediaRoutes, { prefix: "/v1/community/media" });
 await fastify.register(communityReelsRoutes, { prefix: "/v1/community/reels" });
+await fastify.register(moderationRoutes, { prefix: "/v1/moderation" });
 await fastify.register(astrologyRoutes, { prefix: "/v1/astrology" });
 await fastify.register(chatRoutes, { prefix: "/v1/chat" });
 await fastify.register(webhookRoutes, { prefix: "/v1/webhooks" });
@@ -64,6 +75,9 @@ interface ErrorWithCode {
 fastify.setErrorHandler((error, request, reply) => {
   const e = error as ErrorWithCode;
   request.log.error({ error: e }, "Unhandled error");
+  if (env.SENTRY_DSN) {
+    Sentry.captureException(error);
+  }
   const status = e.statusCode ?? 500;
   const code = e.code ?? "INTERNAL_ERROR";
   const message =

@@ -10,3 +10,4 @@ export * from "./memoryBook";
 export * from "./community";
 export * from "./astrology";
 export * from "./aspects";
+export * from "./moderation";

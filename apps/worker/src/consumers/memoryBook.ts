@@ -112,21 +112,20 @@ export function startMemoryBookWorker() {
 
       log.info({ jobId: job.id, userId, exportId }, "Memory book export complete");
     },
-    {
-      connection: redis,
-      concurrency: 2,
-      defaultJobOptions: { attempts: 2, backoff: { type: "exponential", delay: 10000 } },
-    },
+    { connection: redis, concurrency: 2 },
   );
 
   worker.on("failed", async (job, err) => {
     log.error({ jobId: job?.id, err }, "Memory book job failed");
     if (job) {
-      await supabase
-        .from("memory_book_exports")
-        .update({ status: "failed", error_message: err.message })
-        .eq("id", job.data.exportId)
-        .catch(() => undefined);
+      try {
+        await supabase
+          .from("memory_book_exports")
+          .update({ status: "failed", error_message: err.message })
+          .eq("id", job.data.exportId);
+      } catch {
+        /* ignore secondary failure */
+      }
     }
   });
 }

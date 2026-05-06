@@ -31,18 +31,25 @@ export interface ViolationContext {
   postExcerpt: string;
   reason: string;
   reportCount: number;
+  flaggedLabels?: string[];
   appealUrl?: string;
 }
 
 export async function sendTOSViolationEmail(to: string, ctx: ViolationContext): Promise<void> {
   const subject = "[Lumina] Your post was removed for a community guidelines violation";
+
+  const reportLine = ctx.reportCount > 0 ? `Reports received: ${ctx.reportCount}\n` : "";
+  const labelsLine = ctx.flaggedLabels?.length
+    ? `Flagged for: ${ctx.flaggedLabels.map(humanReason).join(", ")}\n`
+    : "";
+
   const text = `Hi,
 
-We removed one of your community posts after multiple members reported it.
+We removed one of your community posts after an automated review and/or
+community reports.
 
 Reason: ${humanReason(ctx.reason)}
-Reports received: ${ctx.reportCount}
-Excerpt: "${ctx.postExcerpt.slice(0, 200)}${ctx.postExcerpt.length > 200 ? "…" : ""}"
+${labelsLine}${reportLine}Excerpt: "${ctx.postExcerpt.slice(0, 200)}${ctx.postExcerpt.length > 200 ? "…" : ""}"
 
 We hold space for hard motherhood feelings — and we also hold the line on safety.
 Posts that target other moms, spread harm, or break our community guidelines are
@@ -98,6 +105,18 @@ function humanReason(code: string): string {
     case "spam": return "Spam";
     case "misinformation": return "Misinformation";
     case "harassment": return "Harassment of another member";
-    default: return "Community guidelines violation";
+    case "harassment_threatening": return "Threats toward another member";
+    case "hate": return "Hateful content";
+    case "hate_threatening": return "Hateful threats";
+    case "self_harm": return "Self-harm content";
+    case "self_harm_intent": return "Stated self-harm intent";
+    case "self_harm_instructions": return "Instructions to self-harm";
+    case "sexual": return "Sexual content";
+    case "sexual_minors": return "Sexual content involving minors";
+    case "violence": return "Graphic violence";
+    case "violence_graphic": return "Graphic violence";
+    case "illicit": return "Illegal activity";
+    case "illicit_violent": return "Illegal violent activity";
+    default: return code.length > 0 ? code.replace(/_/g, " ") : "Community guidelines violation";
   }
 }

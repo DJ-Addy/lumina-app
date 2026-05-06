@@ -16,6 +16,7 @@ import { BreathingOrb, type OrbState } from "../../src/components/BreathingOrb";
 import { UpgradeSheet } from "../../src/components/UpgradeSheet";
 import { streamChat, type ChatTurn } from "../../src/services/chat";
 import { journalService } from "../../src/services/journal";
+import { alertJournalCrisisIfNeeded } from "../../src/lib/journalCrisis";
 import { hasSupabaseConfig } from "../../src/lib/supabase";
 import { colors, radius, spacing, typography } from "../../src/theme/tokens";
 
@@ -38,12 +39,13 @@ export default function ChatJournalScreen() {
   const saveReflectionToJournal = useCallback(
     async (userText: string, assistantText: string) => {
       try {
-        await journalService.createEntry({
+        const saved = await journalService.createEntry({
           mode: "text",
           content: `${userText}\n\n— Lumina reflected:\n${assistantText}`,
           moodTags: [],
           isNightEntry: false,
         });
+        alertJournalCrisisIfNeeded(saved);
         queryClient.invalidateQueries({ queryKey: ["timeline"] });
       } catch (e) {
         console.warn("[chat] failed to save reflection", e);

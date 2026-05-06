@@ -14,7 +14,6 @@ export default function CommunityStackLayout() {
       <Stack.Screen name="post/[id]" options={{ title: "" }} />
       <Stack.Screen name="share-composer" options={{ title: "Share", presentation: "modal" }} />
       <Stack.Screen name="reels" options={{ headerShown: false, presentation: "fullScreenModal" }} />
-      <Stack.Screen name="saved" options={{ title: "Saved" }} />
     </Stack>
   );
 }

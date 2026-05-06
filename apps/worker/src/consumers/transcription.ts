@@ -81,7 +81,7 @@ export function startTranscriptionWorker() {
 
       log.info({ jobId: job.id, userId }, "Transcription complete");
     },
-    { connection: redis, concurrency: env.CONCURRENCY, attempts: 2 },
+    { connection: redis, concurrency: env.CONCURRENCY },
   );
 
   worker.on("failed", async (job, err) => {
@@ -116,8 +116,8 @@ async function downloadFile(url: string, localPath: string): Promise<void> {
   };
 
   await pump();
-  await new Promise((resolve, reject) => {
-    writeStream.on("finish", resolve);
+  await new Promise<void>((resolve, reject) => {
+    writeStream.on("finish", () => resolve());
     writeStream.on("error", reject);
   });
 }

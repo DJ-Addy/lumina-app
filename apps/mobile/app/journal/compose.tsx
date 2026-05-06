@@ -14,6 +14,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { MoodTag, JournalEntryMode } from "@lumina/shared";
 import { journalService } from "../../src/services/journal";
+import { alertJournalCrisisIfNeeded } from "../../src/lib/journalCrisis";
 import { CTAButton } from "../../src/components/CTAButton";
 import { MoodTagSelector } from "../../src/components/MoodTagSelector";
 import { useUIStore } from "../../src/store/ui";
@@ -36,7 +37,8 @@ export default function ComposeScreen() {
         moodTags,
         isNightEntry: isNightMode,
       }),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      alertJournalCrisisIfNeeded(data);
       queryClient.invalidateQueries({ queryKey: ["timeline"] });
       router.back();
     },

@@ -7,6 +7,7 @@ import {
 } from "@lumina/shared";
 import { supabase } from "../lib/supabase.js";
 import { queues } from "../lib/queue.js";
+import { moderateText } from "../lib/textModeration.js";
 
 export async function journalRoutes(fastify: FastifyInstance) {
   fastify.addHook("preHandler", fastify.authenticate);
@@ -19,6 +20,12 @@ export async function journalRoutes(fastify: FastifyInstance) {
 
     const babyBirthDate = await getUserBabyBirthDate(request.user.id);
     const { weekNumber, monthNumber } = getPostpartumWeekAndMonth(babyBirthDate);
+
+    const mod = await moderateText(body.data.content);
+    const crisisPayload =
+      mod.severity === "crisis"
+        ? { showResources: true as const, labels: mod.labels.map((l) => ({ label: l.label, score: l.score })) }
+        : undefined;
 
     const { data, error } = await supabase
       .from("journal_entries")
@@ -40,7 +47,10 @@ export async function journalRoutes(fastify: FastifyInstance) {
       return reply.status(500).send({ code: "DB_ERROR", message: "Failed to create entry" });
     }
 
-    return reply.status(201).send({ entry: mapEntry(data) });
+    return reply.status(201).send({
+      entry: mapEntry(data),
+      ...(crisisPayload !== undefined ? { crisis: crisisPayload } : {}),
+    });
   });
 
   fastify.get("/entries", async (request, reply) => {
@@ -104,6 +114,17 @@ export async function journalRoutes(fastify: FastifyInstance) {
     if (body.data.content !== undefined) updates["content"] = body.data.content;
     if (body.data.moodTags !== undefined) updates["mood_tags"] = body.data.moodTags;
 
+    let crisisPayload: { showResources: true; labels: { label: string; score: number }[] } | undefined;
+    if (body.data.content !== undefined) {
+      const mod = await moderateText(body.data.content);
+      if (mod.severity === "crisis") {
+        crisisPayload = {
+          showResources: true,
+          labels: mod.labels.map((l) => ({ label: l.label, score: l.score })),
+        };
+      }
+    }
+
     const { data, error } = await supabase
       .from("journal_entries")
       .update(updates)
@@ -116,7 +137,10 @@ export async function journalRoutes(fastify: FastifyInstance) {
     if (error || !data) {
       return reply.status(404).send({ code: "NOT_FOUND", message: "Entry not found" });
     }
-    return reply.send({ entry: mapEntry(data) });
+    return reply.send({
+      entry: mapEntry(data),
+      ...(crisisPayload !== undefined ? { crisis: crisisPayload } : {}),
+    });
   });
 
   fastify.delete<{ Params: { id: string } }>("/entries/:id", async (request, reply) => {

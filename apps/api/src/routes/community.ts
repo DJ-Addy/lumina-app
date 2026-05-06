@@ -22,6 +22,7 @@ import {
   POST_SELECT,
 } from "./communityHelpers.js";
 import { incrementReportCounter } from "../lib/reportsCounter.js";
+import { moderateText } from "../lib/textModeration.js";
 
 export async function communityRoutes(fastify: FastifyInstance) {
   fastify.addHook("preHandler", fastify.authenticate);
@@ -183,6 +184,32 @@ export async function communityRoutes(fastify: FastifyInstance) {
       }
     }
 
+    // Server-side text moderation (defense in depth — client also screens).
+    // Combine all human-authored text the user submitted into one pass.
+    const textToCheck = [
+      data.content ?? "",
+      data.poll?.question ?? "",
+      ...(data.poll?.options ?? []),
+    ]
+      .filter(Boolean)
+      .join("\n");
+    let modLabels: { label: string; score: number }[] = [];
+    let modReason: string | null = null;
+    if (textToCheck.length > 0) {
+      const mod = await moderateText(textToCheck);
+      modLabels = mod.labels;
+      modReason = mod.reason ?? null;
+      if (mod.severity === "block") {
+        return reply.status(422).send({
+          code: "CONTENT_REJECTED",
+          message: mod.reason ?? "Content violates community guidelines",
+          labels: mod.labels,
+        });
+      }
+      // crisis & warn are allowed through — client handles UX. We still
+      // record the labels so reviewers can audit.
+    }
+
     // Verify repost target exists
     if (data.repostOfId) {
       const { data: target } = await supabase
@@ -234,6 +261,9 @@ export async function communityRoutes(fastify: FastifyInstance) {
       poll_id: pollId,
       reaction_counts: {},
       comment_count: 0,
+      moderation_labels: modLabels,
+      moderation_reason: modReason,
+      moderation_checked_at: new Date().toISOString(),
     };
 
     const { data: post, error } = await supabase
@@ -391,12 +421,24 @@ export async function communityRoutes(fastify: FastifyInstance) {
     const profile = await getCommunityProfile(request.user.id);
     if (!profile) return reply.status(500).send({ code: "PROFILE_ERROR", message: "Profile error" });
 
+    const mod = await moderateText(body.data.content);
+    if (mod.severity === "block") {
+      return reply.status(422).send({
+        code: "CONTENT_REJECTED",
+        message: mod.reason ?? "Comment violates community guidelines",
+        labels: mod.labels,
+      });
+    }
+
     const { data: comment, error } = await supabase
       .from("community_comments")
       .insert({
         post_id: request.params.postId,
         community_profile_id: profile["id"],
         content: body.data.content,
+        moderation_labels: mod.labels,
+        moderation_reason: mod.reason ?? null,
+        moderation_checked_at: new Date().toISOString(),
       })
       .select(`*, community_profiles!inner(id, alias, avatar_seed, bio, followers_count, following_count, post_count, joined_at, suspended_at)`)
       .single();

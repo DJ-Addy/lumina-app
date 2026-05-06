@@ -43,6 +43,24 @@ export const JournalEntriesResponseSchema = z.object({
 });
 export type JournalEntriesResponse = z.infer<typeof JournalEntriesResponseSchema>;
 
+/** Returned from POST/PATCH journal entry when OpenAI moderation flags self-harm (non-blocking). */
+export const JournalCrisisInfoSchema = z.object({
+  showResources: z.boolean(),
+  labels: z.array(
+    z.object({
+      label: z.string(),
+      score: z.number(),
+    }),
+  ),
+});
+export type JournalCrisisInfo = z.infer<typeof JournalCrisisInfoSchema>;
+
+export const JournalSaveResponseSchema = z.object({
+  entry: JournalEntrySchema,
+  crisis: JournalCrisisInfoSchema.optional(),
+});
+export type JournalSaveResponse = z.infer<typeof JournalSaveResponseSchema>;
+
 export const JournalQueryParamsSchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(1),
   pageSize: z.coerce.number().int().min(1).max(50).optional().default(20),

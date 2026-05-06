@@ -3,6 +3,7 @@ import type {
   CreateJournalEntryRequest,
   JournalEntry,
   JournalEntriesResponse,
+  JournalSaveResponse,
   TimelineResponse,
   TimelineWeekGroup,
 } from "@lumina/shared";
@@ -48,7 +49,7 @@ function weekOfYear(date: Date): number {
 }
 
 export const demoJournalStore = {
-  async createEntry(input: CreateJournalEntryRequest): Promise<{ entry: JournalEntry }> {
+  async createEntry(input: CreateJournalEntryRequest): Promise<JournalSaveResponse> {
     const entries = await loadAll();
     const now = new Date();
     const entry: JournalEntry = {

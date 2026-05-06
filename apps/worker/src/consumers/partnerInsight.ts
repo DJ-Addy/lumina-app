@@ -52,11 +52,7 @@ export function startPartnerInsightWorker() {
 
       log.info({ jobId: job.id, userId }, "Partner insight complete");
     },
-    {
-      connection: redis,
-      concurrency: env.CONCURRENCY,
-      defaultJobOptions: { attempts: 3, backoff: { type: "exponential", delay: 3000 } },
-    },
+    { connection: redis, concurrency: env.CONCURRENCY },
   );
 
   worker.on("failed", (job, err) => {

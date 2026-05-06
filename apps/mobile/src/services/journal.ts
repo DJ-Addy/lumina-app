@@ -3,6 +3,7 @@ import type {
   JournalEntriesResponse,
   JournalEntry,
   JournalQueryParams,
+  JournalSaveResponse,
   UpdateJournalEntryRequest,
   VoiceTranscribeRequest,
   VoiceTranscribeResponse,
@@ -25,13 +26,13 @@ export const journalService = {
     return apiGet<{ entry: JournalEntry }>(`/v1/journal/entries/${id}`);
   },
 
-  createEntry: (data: CreateJournalEntryRequest): Promise<{ entry: JournalEntry }> => {
+  createEntry: (data: CreateJournalEntryRequest): Promise<JournalSaveResponse> => {
     if (!hasSupabaseConfig) return demoJournalStore.createEntry(data);
-    return apiPost<{ entry: JournalEntry }>("/v1/journal/entries", data);
+    return apiPost<JournalSaveResponse>("/v1/journal/entries", data);
   },
 
   updateEntry: (id: string, data: UpdateJournalEntryRequest) =>
-    apiPatch<{ entry: JournalEntry }>(`/v1/journal/entries/${id}`, data),
+    apiPatch<JournalSaveResponse>(`/v1/journal/entries/${id}`, data),
 
   deleteEntry: (id: string): Promise<void> => {
     if (!hasSupabaseConfig) return demoJournalStore.deleteEntry(id);

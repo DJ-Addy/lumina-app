@@ -19,7 +19,9 @@ export interface MemoryBookData {
 }
 
 export async function generateMemoryBookPdf(data: MemoryBookData): Promise<string> {
-  const buffer = await renderToBuffer(createElement(MemoryBookDocument, data));
+  const buffer = await renderToBuffer(
+    createElement(MemoryBookDocument, data) as unknown as Parameters<typeof renderToBuffer>[0],
+  );
 
   const fileName = `memory-book-${Date.now()}.pdf`;
   const filePath = join(tmpdir(), fileName);

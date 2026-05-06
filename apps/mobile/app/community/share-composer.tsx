@@ -23,6 +23,8 @@ import {
 } from "../../src/services/communityMedia";
 import { CTAButton } from "../../src/components/CTAButton";
 import { PollComposer, isValidPoll, type DraftPoll } from "../../src/components/PollComposer";
+import { screenText } from "../../src/lib/moderation";
+import { MODERATION_LABEL_COPY, type ModerationLabel } from "@lumina/shared";
 import { colors, spacing, typography, radius } from "../../src/theme/tokens";
 
 type Mode = "text" | "image" | "video" | "poll";
@@ -56,6 +58,47 @@ export default function ShareComposerScreen() {
     mutationFn: async () => {
       const postType: CommunityPostType =
         mode === "poll" ? "poll" : mode === "video" ? "video" : mode === "image" ? "image" : "text";
+
+      // Pre-flight text moderation: combine content + poll text and screen.
+      const textToCheck = [
+        content.trim(),
+        mode === "poll" ? poll.question.trim() : "",
+        mode === "poll" ? poll.options.map((o) => o.trim()).filter(Boolean).join("\n") : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      if (textToCheck) {
+        const verdict = await screenText(textToCheck, mode === "poll" ? "poll" : "post");
+        if (verdict.severity === "block") {
+          const reasons = verdict.labels
+            .slice(0, 3)
+            .map((l) => MODERATION_LABEL_COPY[l.label as ModerationLabel] ?? l.label)
+            .join(", ");
+          throw new ContentRejectedError(
+            verdict.reason ?? "This post can't be shared as written.",
+            reasons,
+          );
+        }
+        if (verdict.severity === "crisis") {
+          throw new CrisisInterventionError();
+        }
+        if (verdict.severity === "warn") {
+          // Soft warning: ask the user to confirm before sending.
+          const proceed = await new Promise<boolean>((resolve) => {
+            Alert.alert(
+              "Just checking in",
+              verdict.reason ?? "This post may not land well. Share anyway?",
+              [
+                { text: "Edit", style: "cancel", onPress: () => resolve(false) },
+                { text: "Share anyway", onPress: () => resolve(true) },
+              ],
+            );
+          });
+          if (!proceed) throw new SoftAbortError();
+        }
+      }
+
       return communityService.createPost({
         postType,
         visibility,
@@ -77,7 +120,28 @@ export default function ShareComposerScreen() {
       queryClient.invalidateQueries({ queryKey: ["community-reels"] });
       router.back();
     },
-    onError: (e) => Alert.alert("Could not share", String((e as Error).message ?? e)),
+    onError: (err) => {
+      if (err instanceof SoftAbortError) return;
+      if (err instanceof CrisisInterventionError) {
+        Alert.alert(
+          "We're here for you",
+          "What you wrote has us a little worried. You're not alone in this.\n\n" +
+            "If you're in the US, call or text 988 — the Suicide & Crisis Lifeline.\n" +
+            "If you'd rather talk to a postpartum-trained listener, call 1-833-943-5746 (PSI HelpLine).\n\n" +
+            "Your post wasn't sent — but if you'd like, save it as a journal entry just for you.",
+          [{ text: "Okay" }],
+        );
+        return;
+      }
+      if (err instanceof ContentRejectedError) {
+        Alert.alert(
+          "Post can't be shared",
+          err.reasons ? `${err.message}\n\nFlagged for: ${err.reasons}` : err.message,
+        );
+        return;
+      }
+      Alert.alert("Could not share", String((err as Error).message ?? err));
+    },
   });
 
   async function pickImages() {
@@ -87,7 +151,7 @@ export default function ShareComposerScreen() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       allowsMultipleSelection: true,
       quality: 0.85,
       selectionLimit: 4,
@@ -113,7 +177,7 @@ export default function ShareComposerScreen() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      mediaTypes: ["videos"],
       allowsMultipleSelection: false,
       videoMaxDuration: 90,
       quality: 0.85,
@@ -336,6 +400,25 @@ export default function ShareComposerScreen() {
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+class ContentRejectedError extends Error {
+  constructor(message: string, public reasons?: string) {
+    super(message);
+    this.name = "ContentRejectedError";
+  }
+}
+class CrisisInterventionError extends Error {
+  constructor() {
+    super("crisis_intervention");
+    this.name = "CrisisInterventionError";
+  }
+}
+class SoftAbortError extends Error {
+  constructor() {
+    super("soft_abort");
+    this.name = "SoftAbortError";
+  }
 }
 
 const styles = StyleSheet.create({

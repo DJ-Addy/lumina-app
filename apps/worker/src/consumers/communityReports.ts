@@ -65,7 +65,7 @@ async function actionPost(postId: string, reason: string, reportCount: number) {
   // 1. Look up the post + owner
   const { data: post, error: pErr } = await supabase
     .from("community_posts")
-    .select("id, content, excerpt, profile_id, deleted_at")
+    .select("id, content, excerpt, profile_id, deleted_at, moderation_labels")
     .eq("id", postId)
     .maybeSingle();
   if (pErr || !post) {
@@ -116,6 +116,7 @@ async function actionPost(postId: string, reason: string, reportCount: number) {
       postExcerpt: (post["excerpt"] as string) ?? (post["content"] as string) ?? "",
       reason,
       reportCount,
+      flaggedLabels: extractLabels(post["moderation_labels"]),
     });
   } else {
     log.warn({ postId, ownerId: owner.profileId }, "Owner has no email; skipping email");
@@ -135,7 +136,7 @@ async function actionPost(postId: string, reason: string, reportCount: number) {
 async function actionComment(commentId: string, reason: string, reportCount: number) {
   const { data: comment, error } = await supabase
     .from("community_comments")
-    .select("id, content, profile_id, deleted_at")
+    .select("id, content, profile_id, deleted_at, moderation_labels")
     .eq("id", commentId)
     .maybeSingle();
   if (error || !comment) {
@@ -172,6 +173,7 @@ async function actionComment(commentId: string, reason: string, reportCount: num
       postExcerpt: (comment["content"] as string) ?? "",
       reason,
       reportCount,
+      flaggedLabels: extractLabels(comment["moderation_labels"]),
     });
   }
 
@@ -183,6 +185,18 @@ async function actionComment(commentId: string, reason: string, reportCount: num
   if (newViolationCount >= env.VIOLATION_SUSPEND_THRESHOLD) {
     await suspendOwner(owner, `Repeated guideline violations (${newViolationCount} strikes)`);
   }
+}
+
+function extractLabels(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((entry) => {
+      if (entry && typeof entry === "object" && "label" in entry) {
+        return String((entry as { label: unknown }).label);
+      }
+      return null;
+    })
+    .filter((l): l is string => l !== null);
 }
 
 async function getOwnerInfo(profileId: string): Promise<OwnerInfo | null> {

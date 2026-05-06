@@ -66,7 +66,7 @@ export default function RootLayout() {
           options={{ title: "Talk with Lumina", presentation: "modal", headerShown: false }}
         />
         <Stack.Screen name="journal/[id]" options={{ title: "Entry" }} />
-        <Stack.Screen name="community/post/[id]" options={{ title: "Post" }} />
+        <Stack.Screen name="community" options={{ headerShown: false }} />
       </Stack>
     </QueryClientProvider>
   );
